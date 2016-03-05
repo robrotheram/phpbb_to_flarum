@@ -343,7 +343,7 @@ function trimSmilies($postText)
 		$startPos1 = strpos($postText, $startStr1);
 		$endPos1 = strpos($postText, $endStr1);
 
-		$postText = substr_replace($postText, NULL, $startPos1, $endPos1-$startPos1+strlen($endStr1);
+		$postText = substr_replace($postText, NULL, $startPos1, $endPos1-$startPos1+strlen($endStr1));
 	}
 
 	return $postText;
