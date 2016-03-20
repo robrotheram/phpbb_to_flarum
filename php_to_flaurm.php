@@ -228,7 +228,6 @@ if ($result->num_rows > 0)
 		$comma =  $i == $total ? ";" : ",";
 		fwrite($sqlScript, "	(".($row["user_id"]).", ".($row["topic_id"]).")".$comma."\n");
 		$i++;
-		print_r2($i);
 	}
 
 	echo "Success";
