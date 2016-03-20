@@ -1,6 +1,7 @@
 <?php
 // Original script by robrotheram from discuss.flarum.org
 // Modified by VIRUXE
+// And Reflic
 
 set_time_limit(0);
 ini_set('memory_limit', -1);
@@ -12,8 +13,8 @@ ini_set("error_log", "php-error.log");
 $servername = "localhost";
 $username = "root";
 $password = "";
-$exportDBName = "phpbb_name";
-$importDBName = "flarum_name";
+$exportDBName = "old-dlrg";
+$importDBName = "flarum";
 
 // Establish a connection to the server where the PHPBB database exists
 $exportDbConnection = new mysqli($servername, $username, $password, $exportDBName);
@@ -117,12 +118,13 @@ fclose($sqlScript);
 
 
 // Convert Topics to Discussions
-$sqlScript_discussions = fopen('flarum_discussions.sql', 'w');
+$sqlScript_discussions = fopen('flarum_discussions.sql', 'w'); //add last post id / last post number?
 $sqlScript_discussions_tags = fopen('flarum_discussions_tags.sql', 'w');
 
 echo "<hr>Step 3 - Topics<hr>";
 $topicsQuery = $exportDbConnection->query("SELECT topic_id, topic_poster, forum_id, topic_title, topic_time FROM phpbb_topics ORDER BY topic_id DESC;");
 $topicCount = $topicsQuery->num_rows;
+
 if($topicCount) 
 {
 	$curTopicCount = 0;
@@ -217,11 +219,17 @@ $sqlScript = fopen('flarum_user_discussions.sql', 'w');
 echo "<hr>Last Step - User Discussions<hr/>";
 $result = $exportDbConnection->query("SELECT user_id, topic_id FROM phpbb_topics_posted");
 if ($result->num_rows > 0) 
-{
+{	
+	$total = $result->num_rows;
 	fwrite($sqlScript, "INSERT INTO users_discussions (user_id, discussion_id) VALUES ");
 
-	while($row = $result->fetch_assoc()) 
-		fwrite($sqlScript, "(".($row["user_id"]).", ".($row["topic_id"])."),");
+	$i = 1;
+	while($row = $result->fetch_assoc()) {
+		$comma =  $i == $total ? ";" : ",";
+		fwrite($sqlScript, "	(".($row["user_id"]).", ".($row["topic_id"]).")".$comma."\n");
+		$i++;
+		print_r2($i);
+	}
 
 	echo "Success";
 } 
