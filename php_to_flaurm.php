@@ -189,7 +189,7 @@ if($topicCount)
 		$date = new DateTime();
 		$date->setTimestamp($topic["topic_time"]);
 		$discussionDate = $date->format('Y-m-d H:i:s');
-		$topicTitle = formatText($exportDbConnection, $topic["topic_title"]);
+		$topicTitle = $exportDbConnection->real_escape_string($topic["topic_title"]);
 
 		// Link Discussion/Topic to a Tag/Category
 		fwrite($sqlScript_discussions_tags, sprintf("\t(%d, %d),\n", $topic["topic_id"], $topic["forum_id"]));
