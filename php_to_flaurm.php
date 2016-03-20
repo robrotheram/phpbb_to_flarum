@@ -134,6 +134,8 @@ if($topicCount)
 	fwrite($sqlScript_discussions_tags, "INSERT INTO discussions_tags (discussion_id, tag_id) VALUES \n");
 	
 	//	Loop trough all PHPBB topics
+	$topictotal = $topicsQuery->num_rows;
+	$i = 1;
 	while($topic = $topicsQuery->fetch_assoc()) 
 	{
 		//	Convert posts per topic
@@ -204,8 +206,8 @@ if($topicCount)
 			$lastPosterID = $topic["topic_poster"];
 
 		// id, title, start_time, comments_count, participants_count, start_post_id, last_post_id, start_user_id, last_user_id, last_time
-		$valuesStr = sprintf("\t(%d, '%s', '%s', %d, %d, %d, %d, %d, %d, '%s'),\n", $topic["topic_id"], $topicTitle, $discussionDate, $postCount, count($participantsArr), 1, 1, $topic["topic_poster"], $lastPosterID, $discussionDate);
-		
+		$valuesStr = sprintf("\t(%d, '%s', '%s', %d, %d, %d, %d, %d, %d, '%s')%s\n", $topic["topic_id"], $topicTitle, $discussionDate, $postCount, count($participantsArr), 1, 1, $topic["topic_poster"], $lastPosterID, $discussionDate, $i != $topictotal ? "," : ";");
+		$i++;
 		fwrite($sqlScript_discussions, $valuesStr);
 	}
 } 
