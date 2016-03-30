@@ -9,12 +9,12 @@ ini_set('memory_limit', -1);
 ini_set("log_errors", 1);
 ini_set("error_log", "php-error.log");
 
-// Configs for PHPBB database
-$servername = "localhost";
+$servername = "172.17.0.2";
 $username = "root";
-$password = "";
-$exportDBName = "old-dlrg";
-$importDBName = "flarum";
+$password = "mallard4468";
+$exportDBName = "forums";
+$importDBName = "flaurm";
+
 
 // Establish a connection to the server where the PHPBB database exists
 $exportDbConnection = new mysqli($servername, $username, $password, $exportDBName);
@@ -27,11 +27,11 @@ else
 {
 	echo "Export - Connected successfully<br>";
 
-	if(!$exportDbConnection->set_charset("utf8")) 
+	if(!$exportDbConnection->set_charset("utf8"))
 	{
 	    printf("Error loading character set utf8: %s\n", $exportDbConnection->error);
 	    exit();
-	} 
+	}
 	else
 	    printf("Current character set: %s\n", $exportDbConnection->character_set_name());
 }
@@ -42,11 +42,11 @@ else
 {
 	echo "Import - Connected successfully<br>";
 
-	if(!$importDbConnection->set_charset("utf8")) 
+	if(!$importDbConnection->set_charset("utf8"))
 	{
 	    printf("Error loading character set utf8: %s\n", $importDbConnection->error);
 	    exit();
-	} 
+	}
 	else
 	    printf("Current character set: %s\n", $importDbConnection->character_set_name());
 }
@@ -57,13 +57,13 @@ $sqlScript = fopen('flarum_users.sql', 'w');
 echo "<hr>Step 1 - Users<hr>";
 $result = $exportDbConnection->query("SELECT user_id, from_unixtime(user_regdate) as user_regdate, username_clean, user_email FROM phpbb_users");
 $totalUsers = $result->num_rows;
-if ($totalUsers) 
+if ($totalUsers)
 {
 	fwrite($sqlScript, "INSERT INTO users (id, username, email, password, join_time, is_activated) VALUES \n");
 
 	$i = 0;
 	$usersIgnored = 0;
-	while($row = $result->fetch_assoc()) 
+	while($row = $result->fetch_assoc())
 	{
 		$i++;
 
@@ -73,19 +73,33 @@ if ($totalUsers)
 			$usernameHasSpace = strpos($username, " ");
 
 			if($usernameHasSpace > 0)
+			{
 				$formatedUsername = str_replace(" ", NULL, $username);
-			else
+			}
+			else{
 				$formatedUsername = $username;
+			}
+			$id = $row['user_id'];
+			$email = $row['user_email'];
+			$password = sha1(md5(time()));
+			$jointime = $row['user_regdate'];
 
-			$valuesStr = sprintf("\t(%d, '%s', '%s', '%s', '%s', 1)%s\n", $row["user_id"], $formatedUsername, $row["user_email"], sha1(md5(time())), $row['user_regdate'], $i == $totalUsers ? ";" : ",");
+			$valuesStr = sprintf("\t(%d, '%s', '%s', '%s', '%s', 1)%s\n", $id, $formatedUsername, $email, $password, $jointime, $i == $totalUsers ? ";" : ",");
 			fwrite($sqlScript, $valuesStr);
+
+			$query = "INSERT INTO users (id, username, email, password, join_time, is_activated) VALUES ( '$id', '$formatedUsername', '$email', '$password', '$jointime', 1)";
+			$res = $importDbConnection->query($query);
+			if($res === false) {
+			  echo "Wrong SQL: " . $query . " Error: " . $importDbConnection->error . " <br/>";
+			}
 		}
-		else
+		else {
 			$usersIgnored++;
+		}
 	}
 	echo $i-$usersIgnored . ' out of '. $totalUsers .' Total Users converted';
-} 
-else 
+}
+else
 	echo "Something went wrong.";
 
 fclose($sqlScript);
@@ -96,22 +110,36 @@ $sqlScript = fopen('flarum_tags.sql', 'w');
 echo "<hr>Step 2 - Categories<hr>";
 $result = $exportDbConnection->query("SELECT forum_id, forum_name, forum_desc  FROM phpbb_forums");
 $totalCategories = $result->num_rows;
-if ($totalCategories) 
+if ($totalCategories)
 {
 	fwrite($sqlScript, "INSERT INTO tags (id, name, description, slug, color, position) VALUES \n");
 
 	$i = 1;
-	while($row = $result->fetch_assoc()) 
+	while($row = $result->fetch_assoc())
 	{
-		$slug = slugify($row["forum_name"]);
-		$valuesStr = sprintf("\t(%d, '%s', '%s', '%s', '%s', %d)%s\n", $row["forum_id"], mysql_escape_mimic($row["forum_name"]), mysql_escape_mimic(strip_tags(stripBBCode($row["forum_desc"]))), mysql_escape_mimic($slug), rand_color(), $i, $i == $totalCategories ? ";" : ",");
+		$id = $row["forum_id"];
+		$name = mysql_escape_mimic($row["forum_name"]);
+		$description = mysql_escape_mimic(strip_tags(stripBBCode($row["forum_desc"])));
+		$color = rand_color();
+		$position = $i;
+		$slug = mysql_escape_mimic(slugify($row["forum_name"]));
+
+		$valuesStr = sprintf("\t(%d, '%s', '%s', '%s', '%s', %d)%s\n", $id, $name, $description, $slug, $color, $position, $i == $totalCategories ? ";" : ",");
 		fwrite($sqlScript, $valuesStr);
 
+		$query = "INSERT INTO tags (id, name, description, slug, color, position) VALUES ( '$id', '$name', '$description', '$slug', '$color', '$position')";
+		$res = $importDbConnection->query($query);
+		if($res === false) {
+			echo "Wrong SQL Assumption id Confict now trying a update  <br/>";
+			$queryupdate = "UPDATE tags SET name = '$name', description = '$description', slug = '$slug' WHERE id = '$id' ;";
+			$res = $importDbConnection->query($queryupdate);
+			if($res === false) { echo "Wrong SQL: " . $query . " Error: " . $importDbConnection->error . " <br/>"; }
+		}
 		$i++;
 	}
 	echo $totalCategories . ' Categories converted.';
-} 
-else 
+}
+else
 	echo "Something went wrong.";
 
 fclose($sqlScript);
@@ -125,18 +153,18 @@ echo "<hr>Step 3 - Topics<hr>";
 $topicsQuery = $exportDbConnection->query("SELECT topic_id, topic_poster, forum_id, topic_title, topic_time FROM phpbb_topics ORDER BY topic_id DESC;");
 $topicCount = $topicsQuery->num_rows;
 
-if($topicCount) 
+if($topicCount)
 {
 	$curTopicCount = 0;
 	$insertString = "INSERT INTO posts (id, user_id, discussion_id, time, type, content) VALUES \n";
 
-	fwrite($sqlScript_discussions, "INSERT INTO discussions (id, title, start_time, comments_count, participants_count, start_post_id, last_post_id, start_user_id, last_user_id, last_time) VALUES \n");
+	fwrite($sqlScript_discussions, "INSERT INTO discussions (id, title, slug, start_time, comments_count, participants_count, start_post_id, last_post_id, start_user_id, last_user_id, last_time) VALUES \n");
 	fwrite($sqlScript_discussions_tags, "INSERT INTO discussions_tags (discussion_id, tag_id) VALUES \n");
-	
+
 	//	Loop trough all PHPBB topics
 	$topictotal = $topicsQuery->num_rows;
 	$i = 1;
-	while($topic = $topicsQuery->fetch_assoc()) 
+	while($topic = $topicsQuery->fetch_assoc())
 	{
 		//	Convert posts per topic
 		$participantsArr = [];
@@ -145,13 +173,13 @@ if($topicCount)
 		$sqlQuery = sprintf("SELECT * FROM phpbb_posts WHERE topic_id = %d;", $topic["topic_id"]);
 		$postsQuery = $exportDbConnection->query($sqlQuery);
 		$postCount = $postsQuery->num_rows;
-		
+
 		if($postCount)
 		{
 			$curPost = 0;
 
 			//fwrite($sqlScript_posts, $insertString);
-			while($post = $postsQuery->fetch_assoc()) 
+			while($post = $postsQuery->fetch_assoc())
 			{
 				$curPost++;
 
@@ -184,17 +212,28 @@ if($topicCount)
 		//else
 		//	echo "<br>Topic ". $topic['topic_id'] ." has zero posts.<br>";
 
-		//	Convert topic to Flarum format 
+		//	Convert topic to Flarum format
 		//
 		//	This needs to be done at the end because we need to get the post count first
-		//		
+		//
 		$date = new DateTime();
 		$date->setTimestamp($topic["topic_time"]);
 		$discussionDate = $date->format('Y-m-d H:i:s');
 		$topicTitle = $exportDbConnection->real_escape_string($topic["topic_title"]);
 
 		// Link Discussion/Topic to a Tag/Category
-		fwrite($sqlScript_discussions_tags, sprintf("\t(%d, %d),\n", $topic["topic_id"], $topic["forum_id"]));
+		$topicid = $topic["topic_id"];
+		$forumid = $topic["forum_id"];
+
+
+		fwrite($sqlScript_discussions_tags, sprintf("\t(%d, %d),\n", $topicid, $forumid));
+
+		$query = "INSERT INTO discussions_tags (discussion_id, tag_id) VALUES( '$topicid', '$forumid')";
+		$res = $importDbConnection->query($query);
+		if($res === false) {
+			echo "Wrong SQL: " . $query . " Error: " . $importDbConnection->error . " <br/>";
+		}
+
 
 		// Check for parent forums
 		$parentForum = $exportDbConnection->query("SELECT parent_id FROM phpbb_forums WHERE forum_id = " . $topic["forum_id"]);
@@ -205,12 +244,24 @@ if($topicCount)
 		if($lastPosterID == 0)// Just to make sure it displays an actual username if the topic doesn't have posts? Not sure about this.
 			$lastPosterID = $topic["topic_poster"];
 
+
+		$slug = mysql_escape_mimic(slugify($topicTitle));
+		$count =  count($participantsArr);
+		$poster = $topic["topic_poster"];
+
 		// id, title, start_time, comments_count, participants_count, start_post_id, last_post_id, start_user_id, last_user_id, last_time
-		$valuesStr = sprintf("\t(%d, '%s', '%s', %d, %d, %d, %d, %d, %d, '%s')%s\n", $topic["topic_id"], $topicTitle, $discussionDate, $postCount, count($participantsArr), 1, 1, $topic["topic_poster"], $lastPosterID, $discussionDate, $i != $topictotal ? "," : ";");
+		$valuesStr = sprintf("\t(%d, '%s', '%s', %d, %d, %d, %d, %d, %d, '%s')%s\n", $topicid, $topicTitle, $slug, $discussionDate, $postCount, $count, 1, 1, $poster, $lastPosterID, $discussionDate, $i != $topictotal ? "," : ";");
+
+		$query = "INSERT INTO discussions (id, title, slug, start_time, comments_count, participants_count, start_post_id, last_post_id, start_user_id, last_user_id, last_time) VALUES( '$topicid', '$topicTitle', '$slug', '$discussionDate', '$postCount', '$count', 1, 1, '$poster', '$lastPosterID', '$discussionDate')";
+		$res = $importDbConnection->query($query);
+		if($res === false) {
+			echo "Wrong SQL: " . $query . " Error: " . $importDbConnection->error . " <br/>";
+		}
+
 		$i++;
 		fwrite($sqlScript_discussions, $valuesStr);
 	}
-} 
+}
 
 //fclose($sqlScript_posts);
 fclose($sqlScript_discussions_tags);
@@ -220,21 +271,30 @@ fclose($sqlScript_discussions);
 $sqlScript = fopen('flarum_user_discussions.sql', 'w');
 echo "<hr>Last Step - User Discussions<hr/>";
 $result = $exportDbConnection->query("SELECT user_id, topic_id FROM phpbb_topics_posted");
-if ($result->num_rows > 0) 
-{	
+if ($result->num_rows > 0)
+{
 	$total = $result->num_rows;
 	fwrite($sqlScript, "INSERT INTO users_discussions (user_id, discussion_id) VALUES ");
 
 	$i = 1;
 	while($row = $result->fetch_assoc()) {
 		$comma =  $i == $total ? ";" : ",";
-		fwrite($sqlScript, "	(".($row["user_id"]).", ".($row["topic_id"]).")".$comma."\n");
+		$userID = $row["user_id"];
+		$topicID = $row["topic_id"];
+		fwrite($sqlScript, "	(".($userID).", ".($topicID).")".$comma."\n");
+		$query = "INSERT INTO users_discussions (user_id, discussion_id) VALUES ( '$userID', '$topicID')";
+		$res = $importDbConnection->query($query);
+		if($res === false) {
+			echo "Wrong SQL: " . $query . " Error: " . $importDbConnection->error . " <br/>";
+		}
+
+
 		$i++;
 	}
 
 	echo "Success";
-} 
-else 
+}
+else
 	echo "Table is empty";
 
 // Close connection to the database
@@ -263,12 +323,12 @@ function slugify($text)
 	return $text;
 }
 
-function rand_color() 
+function rand_color()
 {
 	return '#' . str_pad(dechex(mt_rand(0, 0xFFFFFF)), 6, '0', STR_PAD_LEFT);
 }
 
-function mysql_escape_mimic($inp) 
+function mysql_escape_mimic($inp)
 {
 	if(is_array($inp))
 			return array_map(__METHOD__, $inp);
@@ -317,7 +377,9 @@ function convertBBCodeToHTML($bbcode)
 	$bbcode = preg_replace('#\[u](.+)\[\/u]#', "<u>$1</u>", $bbcode);
 	$bbcode = preg_replace('#\[img](.+?)\[\/img]#is', "<img src='$1'\>", $bbcode);
 	$bbcode = preg_replace('#\[quote=(.+?)](.+?)\[\/quote]#is', "<QUOTE><i>&gt;</i>$2</QUOTE>", $bbcode);
-	$bbcode = preg_replace('#\[code:\w+](.+?)\[\/code:\w+]#is', "<CODE>$1<CODE>", $bbcode);
+	$bbcode = preg_replace('#\[code:\w+](.+?)\[\/code:\w+]#is', "<CODE class='hljs'>$1<CODE>", $bbcode);
+	$bbcode = preg_replace('#\[pre](.+?)\[\/pre]#is', "<code>$1<code>", $bbcode);
+	$bbcode = preg_replace('#\[u](.+)\[\/u]#', "<u>$1</u>", $bbcode);
 	$bbcode = preg_replace('#\[\*](.+?)\[\/\*]#is', "<li>$1</li>", $bbcode);
 	$bbcode = preg_replace('#\[color=\#\w+](.+?)\[\/color]#is', "$1", $bbcode);
 	$bbcode = preg_replace('#\[url=(.+?)](.+?)\[\/url]#is', "<a href='$1'>$2</a>", $bbcode);
@@ -342,8 +404,8 @@ function trimSmilies($postText)
 
 	$emoticonsCount = substr_count($postText, '<img src="{SMILIES_PATH}');
 
-	for ($i=0; $i < $emoticonsCount; $i++) 
-	{ 
+	for ($i=0; $i < $emoticonsCount; $i++)
+	{
 		$startPos = strpos($postText, $startStr);
 		$endPos = strpos($postText, $endStr);
 
