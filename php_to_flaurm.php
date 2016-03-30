@@ -9,9 +9,9 @@ ini_set('memory_limit', -1);
 ini_set("log_errors", 1);
 ini_set("error_log", "php-error.log");
 
-$servername = "172.17.0.2";
-$username = "root";
-$password = "mallard4468";
+$servername = "localhost";
+$username = "user";
+$password = "password";
 $exportDBName = "forums";
 $importDBName = "flaurm";
 
