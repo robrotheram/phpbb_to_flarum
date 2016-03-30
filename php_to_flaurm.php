@@ -12,8 +12,8 @@ ini_set("error_log", "php-error.log");
 $servername = "localhost";
 $username = "user";
 $password = "password";
-$exportDBName = "forums";
-$importDBName = "flaurm";
+$exportDBName = "PHPforums";
+$importDBName = "flarum";
 
 
 // Establish a connection to the server where the PHPBB database exists
@@ -52,15 +52,12 @@ else
 }
 
 //Convert Users
-$sqlScript = fopen('flarum_users.sql', 'w');
 
 echo "<hr>Step 1 - Users<hr>";
 $result = $exportDbConnection->query("SELECT user_id, from_unixtime(user_regdate) as user_regdate, username_clean, user_email FROM phpbb_users");
 $totalUsers = $result->num_rows;
 if ($totalUsers)
 {
-	fwrite($sqlScript, "INSERT INTO users (id, username, email, password, join_time, is_activated) VALUES \n");
-
 	$i = 0;
 	$usersIgnored = 0;
 	while($row = $result->fetch_assoc())
@@ -83,10 +80,6 @@ if ($totalUsers)
 			$email = $row['user_email'];
 			$password = sha1(md5(time()));
 			$jointime = $row['user_regdate'];
-
-			$valuesStr = sprintf("\t(%d, '%s', '%s', '%s', '%s', 1)%s\n", $id, $formatedUsername, $email, $password, $jointime, $i == $totalUsers ? ";" : ",");
-			fwrite($sqlScript, $valuesStr);
-
 			$query = "INSERT INTO users (id, username, email, password, join_time, is_activated) VALUES ( '$id', '$formatedUsername', '$email', '$password', '$jointime', 1)";
 			$res = $importDbConnection->query($query);
 			if($res === false) {
@@ -102,18 +95,13 @@ if ($totalUsers)
 else
 	echo "Something went wrong.";
 
-fclose($sqlScript);
-
 //Convert Categories to Tags
-$sqlScript = fopen('flarum_tags.sql', 'w');
 
 echo "<hr>Step 2 - Categories<hr>";
 $result = $exportDbConnection->query("SELECT forum_id, forum_name, forum_desc  FROM phpbb_forums");
 $totalCategories = $result->num_rows;
 if ($totalCategories)
 {
-	fwrite($sqlScript, "INSERT INTO tags (id, name, description, slug, color, position) VALUES \n");
-
 	$i = 1;
 	while($row = $result->fetch_assoc())
 	{
@@ -123,9 +111,6 @@ if ($totalCategories)
 		$color = rand_color();
 		$position = $i;
 		$slug = mysql_escape_mimic(slugify($row["forum_name"]));
-
-		$valuesStr = sprintf("\t(%d, '%s', '%s', '%s', '%s', %d)%s\n", $id, $name, $description, $slug, $color, $position, $i == $totalCategories ? ";" : ",");
-		fwrite($sqlScript, $valuesStr);
 
 		$query = "INSERT INTO tags (id, name, description, slug, color, position) VALUES ( '$id', '$name', '$description', '$slug', '$color', '$position')";
 		$res = $importDbConnection->query($query);
@@ -142,12 +127,6 @@ if ($totalCategories)
 else
 	echo "Something went wrong.";
 
-fclose($sqlScript);
-
-
-// Convert Topics to Discussions
-$sqlScript_discussions = fopen('flarum_discussions.sql', 'w'); //add last post id / last post number?
-$sqlScript_discussions_tags = fopen('flarum_discussions_tags.sql', 'w');
 
 echo "<hr>Step 3 - Topics<hr>";
 $topicsQuery = $exportDbConnection->query("SELECT topic_id, topic_poster, forum_id, topic_title, topic_time FROM phpbb_topics ORDER BY topic_id DESC;");
@@ -157,10 +136,6 @@ if($topicCount)
 {
 	$curTopicCount = 0;
 	$insertString = "INSERT INTO posts (id, user_id, discussion_id, time, type, content) VALUES \n";
-
-	fwrite($sqlScript_discussions, "INSERT INTO discussions (id, title, slug, start_time, comments_count, participants_count, start_post_id, last_post_id, start_user_id, last_user_id, last_time) VALUES \n");
-	fwrite($sqlScript_discussions_tags, "INSERT INTO discussions_tags (discussion_id, tag_id) VALUES \n");
-
 	//	Loop trough all PHPBB topics
 	$topictotal = $topicsQuery->num_rows;
 	$i = 1;
@@ -188,6 +163,8 @@ if($topicCount)
 				$date->setTimestamp($post["post_time"]);
 				$postDate =  $date->format('Y-m-d H:i:s');
 				$postText = formatText($exportDbConnection, $post['post_text']);
+
+				if($post['post_id'] == 913){echo $postText;}
 
 				if(empty($post['post_username']))// If the post_username field has text it means it's a "ghost" post. Therefore we should set the poster id to 0 so Flarum knows it's an invalid user
 				{
@@ -225,9 +202,6 @@ if($topicCount)
 		$topicid = $topic["topic_id"];
 		$forumid = $topic["forum_id"];
 
-
-		fwrite($sqlScript_discussions_tags, sprintf("\t(%d, %d),\n", $topicid, $forumid));
-
 		$query = "INSERT INTO discussions_tags (discussion_id, tag_id) VALUES( '$topicid', '$forumid')";
 		$res = $importDbConnection->query($query);
 		if($res === false) {
@@ -238,9 +212,15 @@ if($topicCount)
 		// Check for parent forums
 		$parentForum = $exportDbConnection->query("SELECT parent_id FROM phpbb_forums WHERE forum_id = " . $topic["forum_id"]);
 		$result = $parentForum->fetch_assoc();
-		if($result['parent_id'] > 0)
-			fwrite($sqlScript_discussions_tags, sprintf("\t(%d, %d),\n", $topic["topic_id"], $result['parent_id']));
-
+		if($result['parent_id'] > 0){
+			$topicid = $topic["topic_id"];
+			$parentid = $result['parent_id'];
+			$query = "INSERT INTO discussions_tags (discussion_id, tag_id) VALUES( '$topicid', '$parentid')";
+			$res = $importDbConnection->query($query);
+			if($res === false) {
+				echo "Wrong SQL: " . $query . " Error: " . $importDbConnection->error . " <br/>";
+			}
+	 	}
 		if($lastPosterID == 0)// Just to make sure it displays an actual username if the topic doesn't have posts? Not sure about this.
 			$lastPosterID = $topic["topic_poster"];
 
@@ -248,10 +228,6 @@ if($topicCount)
 		$slug = mysql_escape_mimic(slugify($topicTitle));
 		$count =  count($participantsArr);
 		$poster = $topic["topic_poster"];
-
-		// id, title, start_time, comments_count, participants_count, start_post_id, last_post_id, start_user_id, last_user_id, last_time
-		$valuesStr = sprintf("\t(%d, '%s', '%s', %d, %d, %d, %d, %d, %d, '%s')%s\n", $topicid, $topicTitle, $slug, $discussionDate, $postCount, $count, 1, 1, $poster, $lastPosterID, $discussionDate, $i != $topictotal ? "," : ";");
-
 		$query = "INSERT INTO discussions (id, title, slug, start_time, comments_count, participants_count, start_post_id, last_post_id, start_user_id, last_user_id, last_time) VALUES( '$topicid', '$topicTitle', '$slug', '$discussionDate', '$postCount', '$count', 1, 1, '$poster', '$lastPosterID', '$discussionDate')";
 		$res = $importDbConnection->query($query);
 		if($res === false) {
@@ -259,43 +235,60 @@ if($topicCount)
 		}
 
 		$i++;
-		fwrite($sqlScript_discussions, $valuesStr);
 	}
 }
-
-//fclose($sqlScript_posts);
-fclose($sqlScript_discussions_tags);
-fclose($sqlScript_discussions);
-
 // Convert user posted topics to user discussions?
-$sqlScript = fopen('flarum_user_discussions.sql', 'w');
-echo "<hr>Last Step - User Discussions<hr/>";
+echo "<hr> User Discussions<hr/>";
 $result = $exportDbConnection->query("SELECT user_id, topic_id FROM phpbb_topics_posted");
 if ($result->num_rows > 0)
 {
 	$total = $result->num_rows;
-	fwrite($sqlScript, "INSERT INTO users_discussions (user_id, discussion_id) VALUES ");
-
 	$i = 1;
 	while($row = $result->fetch_assoc()) {
 		$comma =  $i == $total ? ";" : ",";
 		$userID = $row["user_id"];
 		$topicID = $row["topic_id"];
-		fwrite($sqlScript, "	(".($userID).", ".($topicID).")".$comma."\n");
 		$query = "INSERT INTO users_discussions (user_id, discussion_id) VALUES ( '$userID', '$topicID')";
 		$res = $importDbConnection->query($query);
 		if($res === false) {
 			echo "Wrong SQL: " . $query . " Error: " . $importDbConnection->error . " <br/>";
 		}
-
-
 		$i++;
 	}
-
 	echo "Success";
 }
 else
 	echo "Table is empty";
+
+
+	// Convert user posted topics to user discussions?
+echo "<hr>last Step Update User table<hr/>";
+$result = $importDbConnection->query("SELECT id FROM users");
+if ($result->num_rows > 0)
+{
+	$total = $result->num_rows;
+	$i = 1;
+	while($row = $result->fetch_assoc()) {
+		$comma =  $i == $total ? ";" : ",";
+		$userID = $row["id"];
+		$res = $importDbConnection->query("select * from users_discussions where user_id = '$userID' ");
+		$numTopics =  $res->num_rows;
+
+		$res1 = $importDbConnection->query("select * from posts where user_id = '$userID' ");
+		$numPosts =  $res1->num_rows;
+
+		$query = "UPDATE users SET discussions_count = '$numTopics',  comments_count = '$numPosts' WHERE id = '$userID' ";
+		$res = $importDbConnection->query($query);
+		if($res === false) {
+			echo "Wrong SQL: " . $query . " Error: " . $importDbConnection->error . " <br/>";
+		}
+	}
+	echo "Success";
+}
+else
+	echo "Table is empty";
+
+
 
 // Close connection to the database
 $exportDbConnection->close();
