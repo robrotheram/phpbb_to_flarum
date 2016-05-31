@@ -13,6 +13,11 @@ For anyone who wants to use the script here are the steps I use
 2. when you create the forum make sure the email is different to the one in phbb otherwise there will be some conflicts 
 3. run the my script with the correct database parameters for you. (make sure that the script is executable and the directory writable) 
 
+###Usage using phpmyadmin tested by [demmm](https://github.com/demmm)
+Use phpmyadmin on the old server with phpBB to export, download that database.
+Create a new forum with a clean database on the new server, for Flarum.
+Create another database on that new server, this one to import the old phpBB database into, and run the script.
+
 
 
 ###Contributions welcome 
