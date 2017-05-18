@@ -18,7 +18,6 @@ $importDBName = "flarum";
 
 // Establish a connection to the server where the PHPBB database exists
 $exportDbConnection = new mysqli($servername, $username, $password, $exportDBName);
-$importDbConnection = new mysqli($servername, $username, $password, $importDBName);
 
 // Check connection
 if ($exportDbConnection->connect_error)
@@ -36,6 +35,10 @@ else
 	    printf("Current character set: %s\n", $exportDbConnection->character_set_name());
 }
 
+// Establish a connection to the server where the Flarum database exists
+$importDbConnection = new mysqli($servername, $username, $password, $importDBName);
+
+// Check connection
 if ($importDbConnection->connect_error)
 	die("Import - Connection failed: " . $importDbConnection->connect_error);
 else
