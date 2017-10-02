@@ -21,4 +21,4 @@ For anyone who wants to use the script here are the steps I use
 
 
 ## Contributions Welcome 
-Thanks to [all who have contributed](https://github.com/realodix/phpbb_to_flarum/graphs/contributors) :)
+Thanks to [all who have contributed](https://github.com/robrotheram/phpbb_to_flarum/graphs/contributors) :)
