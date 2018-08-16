@@ -2,6 +2,7 @@
 // Original script by robrotheram from discuss.flarum.org
 // Modified by VIRUXE
 // And Reflic
+// Modified by Tidbit Software
 
 set_time_limit(0);
 ini_set('memory_limit', -1);
@@ -14,6 +15,7 @@ $username = "user";
 $password = "password";
 $exportDBName = "PHPforums";
 $importDBName = "flarum";
+$importDBPrefix = ""; // Leave blank if you did not supply a table prefix when setting up Flarum. Otherwise, supply the full table prefix (i.e. including "_", if used).
 
 
 // Establish a connection to the server where the PHPBB database exists
@@ -83,7 +85,7 @@ if ($totalUsers)
 			$email = $row['user_email'];
 			$password = sha1(md5(time()));
 			$jointime = $row['user_regdate'];
-			$query = "INSERT INTO users (id, username, email, password, join_time, is_activated) VALUES ( '$id', '$formatedUsername', '$email', '$password', '$jointime', 1)";
+			$query = "INSERT INTO " . $importDBPrefix . "users (id, username, email, password, join_time, is_activated) VALUES ( '$id', '$formatedUsername', '$email', '$password', '$jointime', 1)";
 			$res = $importDbConnection->query($query);
 			if($res === false) {
 			  echo "Wrong SQL: " . $query . " Error: " . $importDbConnection->error . " <br/>";
@@ -115,11 +117,11 @@ if ($totalCategories)
 		$position = $i;
 		$slug = mysql_escape_mimic(slugify($row["forum_name"]));
 
-		$query = "INSERT INTO tags (id, name, description, slug, color, position) VALUES ( '$id', '$name', '$description', '$slug', '$color', '$position')";
+		$query = "INSERT INTO " . $importDBPrefix . "tags (id, name, description, slug, color, position) VALUES ( '$id', '$name', '$description', '$slug', '$color', '$position')";
 		$res = $importDbConnection->query($query);
 		if($res === false) {
 			echo "Wrong SQL Assumption id Confict now trying a update  <br/>";
-			$queryupdate = "UPDATE tags SET name = '$name', description = '$description', slug = '$slug' WHERE id = '$id' ;";
+			$queryupdate = "UPDATE " . $importDBPrefix . "tags SET name = '$name', description = '$description', slug = '$slug' WHERE id = '$id' ;";
 			$res = $importDbConnection->query($queryupdate);
 			if($res === false) { echo "Wrong SQL: " . $query . " Error: " . $importDbConnection->error . " <br/>"; }
 		}
@@ -138,7 +140,7 @@ $topicCount = $topicsQuery->num_rows;
 if($topicCount)
 {
 	$curTopicCount = 0;
-	$insertString = "INSERT INTO posts (id, user_id, discussion_id, time, type, content) VALUES \n";
+	$insertString = "INSERT INTO " . $importDBPrefix . "posts (id, user_id, discussion_id, time, type, content) VALUES \n";
 	//	Loop trough all PHPBB topics
 	$topictotal = $topicsQuery->num_rows;
 	$i = 1;
@@ -205,7 +207,7 @@ if($topicCount)
 		$topicid = $topic["topic_id"];
 		$forumid = $topic["forum_id"];
 
-		$query = "INSERT INTO discussions_tags (discussion_id, tag_id) VALUES( '$topicid', '$forumid')";
+		$query = "INSERT INTO " . $importDBPrefix . "discussions_tags (discussion_id, tag_id) VALUES( '$topicid', '$forumid')";
 		$res = $importDbConnection->query($query);
 		if($res === false) {
 			echo "Wrong SQL: " . $query . " Error: " . $importDbConnection->error . " <br/>";
@@ -218,7 +220,7 @@ if($topicCount)
 		if($result['parent_id'] > 0){
 			$topicid = $topic["topic_id"];
 			$parentid = $result['parent_id'];
-			$query = "INSERT INTO discussions_tags (discussion_id, tag_id) VALUES( '$topicid', '$parentid')";
+			$query = "INSERT INTO " . $importDBPrefix . "discussions_tags (discussion_id, tag_id) VALUES( '$topicid', '$parentid')";
 			$res = $importDbConnection->query($query);
 			if($res === false) {
 				echo "Wrong SQL: " . $query . " Error: " . $importDbConnection->error . " <br/>";
@@ -231,7 +233,7 @@ if($topicCount)
 		$slug = mysql_escape_mimic(slugify($topicTitle));
 		$count =  count($participantsArr);
 		$poster = $topic["topic_poster"];
-		$query = "INSERT INTO discussions (id, title, slug, start_time, comments_count, participants_count, start_post_id, last_post_id, start_user_id, last_user_id, last_time) VALUES( '$topicid', '$topicTitle', '$slug', '$discussionDate', '$postCount', '$count', 1, 1, '$poster', '$lastPosterID', '$discussionDate')";
+		$query = "INSERT INTO " . $importDBPrefix . "discussions (id, title, slug, start_time, comments_count, participants_count, start_post_id, last_post_id, start_user_id, last_user_id, last_time) VALUES( '$topicid', '$topicTitle', '$slug', '$discussionDate', '$postCount', '$count', 1, 1, '$poster', '$lastPosterID', '$discussionDate')";
 		$res = $importDbConnection->query($query);
 		if($res === false) {
 			echo "Wrong SQL: " . $query . " Error: " . $importDbConnection->error . " <br/>";
@@ -251,7 +253,7 @@ if ($result->num_rows > 0)
 		$comma =  $i == $total ? ";" : ",";
 		$userID = $row["user_id"];
 		$topicID = $row["topic_id"];
-		$query = "INSERT INTO users_discussions (user_id, discussion_id) VALUES ( '$userID', '$topicID')";
+		$query = "INSERT INTO " . $importDBPrefix . "users_discussions (user_id, discussion_id) VALUES ( '$userID', '$topicID')";
 		$res = $importDbConnection->query($query);
 		if($res === false) {
 			echo "Wrong SQL: " . $query . " Error: " . $importDbConnection->error . " <br/>";
@@ -280,7 +282,7 @@ if ($result->num_rows > 0)
 		$res1 = $importDbConnection->query("select * from posts where user_id = '$userID' ");
 		$numPosts =  $res1->num_rows;
 
-		$query = "UPDATE users SET discussions_count = '$numTopics',  comments_count = '$numPosts' WHERE id = '$userID' ";
+		$query = "UPDATE " . $importDBPrefix . "users SET discussions_count = '$numTopics',  comments_count = '$numPosts' WHERE id = '$userID' ";
 		$res = $importDbConnection->query($query);
 		if($res === false) {
 			echo "Wrong SQL: " . $query . " Error: " . $importDbConnection->error . " <br/>";
