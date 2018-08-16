@@ -2,7 +2,7 @@
 // Original script by robrotheram from discuss.flarum.org
 // Modified by VIRUXE
 // And Reflic
-// Modified by Tidbit Software
+// Modified by TidbitSoftware
 
 set_time_limit(0);
 ini_set('memory_limit', -1);
