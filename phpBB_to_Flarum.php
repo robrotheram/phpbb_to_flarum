@@ -15,6 +15,7 @@ $username = "user";
 $password = "password";
 $exportDBName = "PHPforums";
 $importDBName = "flarum";
+$exportDBPrefix = "phpbb_";
 $importDBPrefix = ""; // Leave blank if you did not supply a table prefix when setting up Flarum. Otherwise, supply the full table prefix (i.e. including "_", if used).
 
 
@@ -59,7 +60,7 @@ else
 //Convert Users
 
 echo "<hr>Step 1 - Users<hr>";
-$result = $exportDbConnection->query("SELECT user_id, from_unixtime(user_regdate) as user_regdate, username_clean, user_email FROM phpbb_users");
+$result = $exportDbConnection->query("SELECT user_id, from_unixtime(user_regdate) as user_regdate, username_clean, user_email FROM ${exportDBPrefix}users");
 $totalUsers = $result->num_rows;
 if ($totalUsers)
 {
@@ -103,7 +104,7 @@ else
 //Convert Categories to Tags
 
 echo "<hr>Step 2 - Categories<hr>";
-$result = $exportDbConnection->query("SELECT forum_id, forum_name, forum_desc  FROM phpbb_forums");
+$result = $exportDbConnection->query("SELECT forum_id, forum_name, forum_desc  FROM ${exportDBPrefix}forums");
 $totalCategories = $result->num_rows;
 if ($totalCategories)
 {
@@ -134,7 +135,7 @@ else
 
 
 echo "<hr>Step 3 - Topics<hr>";
-$topicsQuery = $exportDbConnection->query("SELECT topic_id, topic_poster, forum_id, topic_title, topic_time FROM phpbb_topics ORDER BY topic_id DESC;");
+$topicsQuery = $exportDbConnection->query("SELECT topic_id, topic_poster, forum_id, topic_title, topic_time FROM ${exportDBPrefix}topics ORDER BY topic_id DESC;");
 $topicCount = $topicsQuery->num_rows;
 
 if($topicCount)
@@ -150,7 +151,7 @@ if($topicCount)
 		$participantsArr = [];
 		$lastPosterID = 0;
 
-		$sqlQuery = sprintf("SELECT * FROM phpbb_posts WHERE topic_id = %d;", $topic["topic_id"]);
+		$sqlQuery = sprintf("SELECT * FROM ${exportDBPrefix}posts WHERE topic_id = %d;", $topic["topic_id"]);
 		$postsQuery = $exportDbConnection->query($sqlQuery);
 		$postCount = $postsQuery->num_rows;
 
@@ -215,7 +216,7 @@ if($topicCount)
 
 
 		// Check for parent forums
-		$parentForum = $exportDbConnection->query("SELECT parent_id FROM phpbb_forums WHERE forum_id = " . $topic["forum_id"]);
+		$parentForum = $exportDbConnection->query("SELECT parent_id FROM ${exportDBPrefix}forums WHERE forum_id = " . $topic["forum_id"]);
 		$result = $parentForum->fetch_assoc();
 		if($result['parent_id'] > 0){
 			$topicid = $topic["topic_id"];
@@ -244,7 +245,7 @@ if($topicCount)
 }
 // Convert user posted topics to user discussions?
 echo "<hr> User Discussions<hr/>";
-$result = $exportDbConnection->query("SELECT user_id, topic_id FROM phpbb_topics_posted");
+$result = $exportDbConnection->query("SELECT user_id, topic_id FROM ${exportDBPrefix}topics_posted");
 if ($result->num_rows > 0)
 {
 	$total = $result->num_rows;
