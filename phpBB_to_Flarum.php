@@ -27,7 +27,7 @@ if ($exportDbConnection->connect_error)
 	die("Export - Connection failed: " . $exportDbConnection->connect_error);
 else
 {
-	echo "Export - Connected successfully<br>";
+	echo "Export - Connected successfully<br>\n";
 
 	if(!$exportDbConnection->set_charset("utf8"))
 	{
@@ -46,7 +46,7 @@ if ($importDbConnection->connect_error)
 	die("Import - Connection failed: " . $importDbConnection->connect_error);
 else
 {
-	echo "Import - Connected successfully<br>";
+	echo "Import - Connected successfully<br>\n";
 
 	if(!$importDbConnection->set_charset("utf8"))
 	{
@@ -56,6 +56,12 @@ else
 	else
 	    printf("Current character set: %s\n", $importDbConnection->character_set_name());
 }
+
+
+//Disable foreing keys check
+
+$importDbConnection->query("SET FOREIGN_KEY_CHECKS=0");
+
 
 //Convert Users
 
@@ -86,10 +92,10 @@ if ($totalUsers)
 			$email = $row['user_email'];
 			$password = sha1(md5(time()));
 			$jointime = $row['user_regdate'];
-			$query = "INSERT INTO " . $importDBPrefix . "users (id, username, email, password, join_time, is_activated) VALUES ( '$id', '$formatedUsername', '$email', '$password', '$jointime', 1)";
+			$query = "INSERT INTO " . $importDBPrefix . "users (id, username, email, password, joined_at, is_email_confirmed) VALUES ( '$id', '$formatedUsername', '$email', '$password', '$jointime', 1)";
 			$res = $importDbConnection->query($query);
 			if($res === false) {
-			  echo "Wrong SQL: " . $query . " Error: " . $importDbConnection->error . " <br/>";
+				echo "Wrong SQL: " . $query . " Error: " . $importDbConnection->error . " <br/>\n";
 			}
 		}
 		else {
@@ -121,10 +127,10 @@ if ($totalCategories)
 		$query = "INSERT INTO " . $importDBPrefix . "tags (id, name, description, slug, color, position) VALUES ( '$id', '$name', '$description', '$slug', '$color', '$position')";
 		$res = $importDbConnection->query($query);
 		if($res === false) {
-			echo "Wrong SQL Assumption id Confict now trying a update  <br/>";
+			echo "Wrong SQL Assumption id Confict now trying a update  <br/>\n";
 			$queryupdate = "UPDATE " . $importDBPrefix . "tags SET name = '$name', description = '$description', slug = '$slug' WHERE id = '$id' ;";
 			$res = $importDbConnection->query($queryupdate);
-			if($res === false) { echo "Wrong SQL: " . $query . " Error: " . $importDbConnection->error . " <br/>"; }
+			if($res === false) { echo "Wrong SQL: " . $query . " Error: " . $importDbConnection->error . " <br/>\n"; }
 		}
 		$i++;
 	}
@@ -141,7 +147,7 @@ $topicCount = $topicsQuery->num_rows;
 if($topicCount)
 {
 	$curTopicCount = 0;
-	$insertString = "INSERT INTO " . $importDBPrefix . "posts (id, user_id, discussion_id, time, type, content) VALUES \n";
+	$insertString = "INSERT INTO " . $importDBPrefix . "posts (id, user_id, discussion_id, created_at, type, content) VALUES \n";
 	//	Loop trough all PHPBB topics
 	$topictotal = $topicsQuery->num_rows;
 	$i = 1;
@@ -189,11 +195,15 @@ if($topicCount)
 
 				// Execute the insert query in the desired database.
 				$formattedValuesStr = sprintf("(%d, %d, %d, '%s', 'comment', '%s');", $post['post_id'], $posterID, $topic['topic_id'], $postDate, $postText);
-				$importDbConnection->query($insertString . $formattedValuesStr);
+				$query = $insertString . $formattedValuesStr;
+				$res = $importDbConnection->query($query);
+				if($res === false) {
+					echo "Wrong SQL: " . $query . " Error: " . $importDbConnection->error . " <br/>\n";
+				}
 			}
 		}
 		//else
-		//	echo "<br>Topic ". $topic['topic_id'] ." has zero posts.<br>";
+		//	echo "<br>\nTopic ". $topic['topic_id'] ." has zero posts.<br>\n";
 
 		//	Convert topic to Flarum format
 		//
@@ -208,10 +218,10 @@ if($topicCount)
 		$topicid = $topic["topic_id"];
 		$forumid = $topic["forum_id"];
 
-		$query = "INSERT INTO " . $importDBPrefix . "discussions_tags (discussion_id, tag_id) VALUES( '$topicid', '$forumid')";
+		$query = "INSERT INTO " . $importDBPrefix . "discussion_tag (discussion_id, tag_id) VALUES( '$topicid', '$forumid')";
 		$res = $importDbConnection->query($query);
 		if($res === false) {
-			echo "Wrong SQL: " . $query . " Error: " . $importDbConnection->error . " <br/>";
+			echo "Wrong SQL: " . $query . " Error: " . $importDbConnection->error . " <br/>\n";
 		}
 
 
@@ -221,23 +231,22 @@ if($topicCount)
 		if($result['parent_id'] > 0){
 			$topicid = $topic["topic_id"];
 			$parentid = $result['parent_id'];
-			$query = "INSERT INTO " . $importDBPrefix . "discussions_tags (discussion_id, tag_id) VALUES( '$topicid', '$parentid')";
+			$query = "INSERT INTO " . $importDBPrefix . "discussion_tag (discussion_id, tag_id) VALUES( '$topicid', '$parentid')";
 			$res = $importDbConnection->query($query);
 			if($res === false) {
-				echo "Wrong SQL: " . $query . " Error: " . $importDbConnection->error . " <br/>";
+				echo "Wrong SQL: " . $query . " Error: " . $importDbConnection->error . " <br/>\n";
 			}
 	 	}
 		if($lastPosterID == 0)// Just to make sure it displays an actual username if the topic doesn't have posts? Not sure about this.
 			$lastPosterID = $topic["topic_poster"];
 
-
 		$slug = mysql_escape_mimic(slugify($topicTitle));
 		$count =  count($participantsArr);
 		$poster = $topic["topic_poster"];
-		$query = "INSERT INTO " . $importDBPrefix . "discussions (id, title, slug, start_time, comments_count, participants_count, start_post_id, last_post_id, start_user_id, last_user_id, last_time) VALUES( '$topicid', '$topicTitle', '$slug', '$discussionDate', '$postCount', '$count', 1, 1, '$poster', '$lastPosterID', '$discussionDate')";
+		$query = "INSERT INTO " . $importDBPrefix . "discussions (id, title, slug, created_at, comment_count, participant_count, first_post_id, last_post_id, user_id, last_posted_user_id, last_posted_at) VALUES( '$topicid', '$topicTitle', '$slug', '$discussionDate', '$postCount', '$count', 1, 1, '$poster', '$lastPosterID', '$discussionDate')";
 		$res = $importDbConnection->query($query);
 		if($res === false) {
-			echo "Wrong SQL: " . $query . " Error: " . $importDbConnection->error . " <br/>";
+			echo "Wrong SQL: " . $query . " Error: " . $importDbConnection->error . " <br/>\n";
 		}
 
 		$i++;
@@ -254,10 +263,10 @@ if ($result->num_rows > 0)
 		$comma =  $i == $total ? ";" : ",";
 		$userID = $row["user_id"];
 		$topicID = $row["topic_id"];
-		$query = "INSERT INTO " . $importDBPrefix . "users_discussions (user_id, discussion_id) VALUES ( '$userID', '$topicID')";
+		$query = "INSERT INTO " . $importDBPrefix . "discussion_user (user_id, discussion_id) VALUES ( '$userID', '$topicID')";
 		$res = $importDbConnection->query($query);
 		if($res === false) {
-			echo "Wrong SQL: " . $query . " Error: " . $importDbConnection->error . " <br/>";
+			echo "Wrong SQL: " . $query . " Error: " . $importDbConnection->error . " <br/>\n";
 		}
 		$i++;
 	}
@@ -283,10 +292,10 @@ if ($result->num_rows > 0)
 		$res1 = $importDbConnection->query("select * from posts where user_id = '$userID' ");
 		$numPosts =  $res1->num_rows;
 
-		$query = "UPDATE " . $importDBPrefix . "users SET discussions_count = '$numTopics',  comments_count = '$numPosts' WHERE id = '$userID' ";
+		$query = "UPDATE " . $importDBPrefix . "users SET discussions_count = '$numTopics',  comment_count = '$numPosts' WHERE id = '$userID' ";
 		$res = $importDbConnection->query($query);
 		if($res === false) {
-			echo "Wrong SQL: " . $query . " Error: " . $importDbConnection->error . " <br/>";
+			echo "Wrong SQL: " . $query . " Error: " . $importDbConnection->error . " <br/>\n";
 		}
 	}
 	echo "Success";
